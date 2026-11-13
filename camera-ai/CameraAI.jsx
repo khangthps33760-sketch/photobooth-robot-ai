@@ -234,7 +234,9 @@ export default function CameraAI() {
     async function startAI() {
       try {
         // 1. Kết nối Robot Server
-        const socket = new WebSocket("ws://127.0.0.1:3002");
+        const socket = new WebSocket(
+  "wss://photobooth-robot-ai.onrender.com"
+);
         socketRef.current = socket;
 
         socket.onopen = () => {

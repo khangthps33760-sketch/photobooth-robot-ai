@@ -807,14 +807,13 @@ function scheduleBlink() {
 
 scheduleBlink();
 
-// KẾT NỐI ROBOT SERVER
+// KẾT NỐI ROBOT SERVER ONLINE
 let socket;
 let reconnectTimer;
 
-function connectServer() {
-  const host = window.location.hostname || "127.0.0.1";
-  const socketUrl = `ws://${host}:3002`;
+const socketUrl = "wss://photobooth-robot-ai.onrender.com";
 
+function connectServer() {
   socket = new WebSocket(socketUrl);
 
   socket.onopen = () => {
