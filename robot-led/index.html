@@ -1,0 +1,888 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#030914">
+<title>Next Level - Cyber Luxury Robot</title>
+
+<style>
+* { box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: #030914;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  background:
+    radial-gradient(ellipse at 50% 48%, #123654 0%, #071526 48%, #020711 100%);
+}
+
+#robot {
+  position: relative;
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#connection {
+  position: fixed;
+  right: 14px;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(180,220,240,.55);
+  font-size: 9px;
+  letter-spacing: 1.5px;
+  z-index: 5;
+}
+
+#connection .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff7777;
+  box-shadow: 0 0 9px #ff7777;
+}
+
+#connection.connected .dot {
+  background: #35d9ff;
+  box-shadow: 0 0 10px #35d9ff;
+}
+
+@media (orientation: portrait) {
+  canvas {
+    width: 100%;
+    height: 100%;
+  }
+}
+</style>
+</head>
+
+<body>
+<div id="robot">
+  <canvas id="face"></canvas>
+</div>
+
+<div id="connection">
+  <span class="dot"></span>
+  <span id="connectionText">CONNECTING</span>
+</div>
+
+<script>
+const canvas = document.getElementById("face");
+const ctx = canvas.getContext("2d");
+
+const connection = document.getElementById("connection");
+const connectionText = document.getElementById("connectionText");
+
+const CYAN = "#F47721"; 
+const LIGHT = "#FFD0A8";
+const WHITE = "#F5F7FA";
+const DARK = "#071B36";
+
+const NAVY = "#071B36";
+const ORANGE = "#F47721";
+const SILVER = "#AAB7C5";
+
+let W = 0, H = 0, dpr = 1;
+let scale = 1, offsetX = 0, offsetY = 0;
+
+const DESIGN_W = 1000;
+const DESIGN_H = 650;
+
+let expression = "neutral";
+let blink = 1;
+let blinkTarget = 1;
+
+let gazeX = 0;
+let gazeY = 0;
+let targetGazeX = 0;
+let targetGazeY = 0;
+
+let guestPresent = false;
+let photoboothActive = false;
+let expressionUntil = 0;
+let nextIdleChange = performance.now() + 4000;
+let lastGazeChange = 0;
+
+function resizeCanvas() {
+  const rect = canvas.getBoundingClientRect();
+
+  W = rect.width;
+  H = rect.height;
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+  canvas.width = Math.round(W * dpr);
+  canvas.height = Math.round(H * dpr);
+
+  scale = Math.min(W / DESIGN_W, H / DESIGN_H);
+  offsetX = (W - DESIGN_W * scale) / 2;
+  offsetY = (H - DESIGN_H * scale) / 2;
+}
+
+window.addEventListener("resize", resizeCanvas);
+window.addEventListener("orientationchange", () => {
+  setTimeout(resizeCanvas, 250);
+});
+resizeCanvas();
+
+function roundedRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+}
+
+function glow(color, blur) {
+  ctx.shadowColor = color;
+  ctx.shadowBlur = blur;
+}
+
+function drawBackground(t) {
+  ctx.clearRect(0, 0, W, H);
+
+  const cx = W / 2;
+  const cy = H / 2;
+  const pulse = 0.09 + Math.sin(t * 0.0015) * 0.025;
+
+  const aura = ctx.createRadialGradient(
+    cx, cy, 5, cx, cy, Math.max(W, H) * 0.55
+  );
+
+  aura.addColorStop(0, `rgba(53,217,255,${pulse})`);
+  aura.addColorStop(.5, "rgba(12,65,105,.08)");
+  aura.addColorStop(1, "rgba(0,0,0,0)");
+
+  ctx.fillStyle = aura;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+
+  // Ánh sáng nền phía sau robot
+  const halo = ctx.createRadialGradient(500, 320, 80, 500, 320, 430);
+  halo.addColorStop(0, "rgba(30,140,190,.13)");
+  halo.addColorStop(1, "rgba(0,0,0,0)");
+
+  ctx.fillStyle = halo;
+  ctx.fillRect(0, 0, DESIGN_W, DESIGN_H);
+
+  ctx.restore();
+}
+
+// Khung kim loại cao cấp
+function drawMetalFrame(t) {
+  ctx.save();
+
+  const float = Math.sin(t * .0012) * 3;
+  ctx.translate(0, float);
+
+
+  // Lớp vỏ ngoài
+  const metal = ctx.createLinearGradient(180, 80, 820, 570);
+  metal.addColorStop(0, "#17283b");
+  metal.addColorStop(.15, "#d8e5ef");
+  metal.addColorStop(.28, "#536c82");
+  metal.addColorStop(.5, "#172b40");
+  metal.addColorStop(.75, "#a8bdce");
+  metal.addColorStop(1, "#253b50");
+
+  ctx.fillStyle = metal;
+  roundedRect(180, 105, 640, 435, 105);
+  ctx.fill();
+
+  // Viền kim loại trong
+  const rim = ctx.createLinearGradient(200, 100, 800, 550);
+  rim.addColorStop(0, "#e7f7ff");
+  rim.addColorStop(.3, "#536d83");
+  rim.addColorStop(.65, "#a9c7da");
+  rim.addColorStop(1, "#334b60");
+
+  ctx.strokeStyle = rim;
+  ctx.lineWidth = 7;
+  roundedRect(190, 113, 620, 419, 98);
+  ctx.stroke();
+
+  // Mặt kính đen
+  const glass = ctx.createLinearGradient(250, 130, 700, 520);
+  glass.addColorStop(0, "#102238");
+  glass.addColorStop(.18, "#030a14");
+  glass.addColorStop(.6, "#020711");
+  glass.addColorStop(1, "#091a2a");
+
+  ctx.fillStyle = glass;
+  roundedRect(210, 135, 580, 375, 85);
+  ctx.fill();
+
+  // Viền kính cyan
+  ctx.strokeStyle = "rgba(53,217,255,.55)";
+  ctx.lineWidth = 2;
+  glow(CYAN, 12);
+  roundedRect(210, 135, 580, 375, 85);
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Phản chiếu kính
+  ctx.save();
+  roundedRect(210, 135, 580, 375, 85);
+  ctx.clip();
+
+  const reflection = ctx.createLinearGradient(230, 120, 550, 340);
+  reflection.addColorStop(0, "rgba(255,255,255,.14)");
+  reflection.addColorStop(.35, "rgba(255,255,255,.025)");
+  reflection.addColorStop(1, "rgba(255,255,255,0)");
+
+  ctx.fillStyle = reflection;
+  ctx.beginPath();
+  ctx.moveTo(250, 135);
+  ctx.lineTo(550, 135);
+  ctx.lineTo(380, 260);
+  ctx.lineTo(230, 260);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+
+  // Tai / module kim loại hai bên
+  drawSideModule(168, 315, -1);
+  drawSideModule(832, 315, 1);
+
+  // Đèn trang trí phía trên
+  ctx.fillStyle = CYAN;
+  glow(CYAN, 12);
+  roundedRect(455, 115, 90, 4, 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawSideModule(x, y, side) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(side, 1);
+
+  const metal = ctx.createLinearGradient(-25, 0, 25, 0);
+  metal.addColorStop(0, "#273d51");
+  metal.addColorStop(.5, "#c5d7e5");
+  metal.addColorStop(1, "#344b60");
+
+  ctx.fillStyle = metal;
+  roundedRect(-25, -72, 50, 144, 20);
+  ctx.fill();
+
+  ctx.fillStyle = "#071526";
+  roundedRect(-17, -57, 34, 114, 13);
+  ctx.fill();
+
+  ctx.strokeStyle = CYAN;
+  ctx.lineWidth = 2;
+  glow(CYAN, 13);
+  roundedRect(-12, -42, 24, 84, 10);
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function getEyeStyle(side) {
+  let open = blink;
+  let tilt = 0;
+  let eyeScaleX = 1;
+  let eyeScaleY = 1;
+
+  switch (expression) {
+    case "happy":
+      open *= .78;
+      break;
+    case "laugh":
+      open *= .05;
+      break;
+    case "sad":
+      open *= .76;
+      tilt = side === "left" ? -.10 : .10;
+      break;
+    case "angry":
+      open *= .64;
+      break;
+    case "sleepy":
+      open *= .38;
+      break;
+    case "surprised":
+      open *= 1.15;
+      eyeScaleY = 1.18;
+      eyeScaleX = 1.08;
+      break;
+    case "excited":
+      open *= 1.08;
+      eyeScaleY = 1.1;
+      break;
+    case "curious":
+      open *= side === "left" ? .9 : 1.1;
+      break;
+    case "wink":
+      open *= side === "left" ? .05 : 1;
+      break;
+    case "focused":
+      open *= .68;
+      break;
+    case "love":
+      open *= .8;
+      break;
+  }
+
+  return { open, tilt, eyeScaleX, eyeScaleY };
+}
+
+function drawEye(x, y, side, t) {
+  const s = getEyeStyle(side);
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(s.tilt);
+
+  const breathe = 1 + Math.sin(t * .0018 + (side === "left" ? 0 : 1)) * .012;
+  const eyeW = 105 * s.eyeScaleX * breathe;
+  const eyeH = 100 * s.eyeScaleY * Math.max(.025, s.open);
+
+  // Quầng sáng mắt
+  const aura = ctx.createRadialGradient(0, 0, 5, 0, 0, 100);
+  aura.addColorStop(0, "rgba(53,217,255,.20)");
+  aura.addColorStop(1, "rgba(53,217,255,0)");
+
+  ctx.fillStyle = aura;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 100, 85, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Hình dạng mắt
+  if (expression === "laugh" || expression === "happy") {
+    drawClosedSmileEye(eyeW, eyeH, expression === "laugh");
+  } else if (expression === "love") {
+    drawHeart(0, 0, 34);
+  } else {
+    drawOpenEye(eyeW, eyeH, side, t);
+  }
+
+  ctx.restore();
+}
+
+function drawOpenEye(w, h, side, t) {
+  ctx.save();
+
+  const pupilX = gazeX * 13;
+  const pupilY = gazeY * 10;
+
+  // Mắt LED
+  const eyeGradient = ctx.createLinearGradient(0, -h/2, 0, h/2);
+  eyeGradient.addColorStop(0, WHITE);
+  eyeGradient.addColorStop(.3, LIGHT);
+  eyeGradient.addColorStop(.72, CYAN);
+  eyeGradient.addColorStop(1, "#0788bf");
+
+  ctx.fillStyle = eyeGradient;
+  glow(CYAN, 22);
+
+  if (expression === "surprised" || expression === "excited") {
+    ctx.beginPath();
+    ctx.ellipse(0, 0, w*.45, h*.47, 0, 0, Math.PI*2);
+  } else {
+    roundedRect(-w*.43, -h*.45, w*.86, h*.9, Math.min(w*.4, h*.4));
+  }
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Đồng tử
+  ctx.fillStyle = "#05213a";
+  ctx.beginPath();
+  ctx.ellipse(pupilX, pupilY, w*.19, h*.29, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  // Highlight
+  ctx.fillStyle = WHITE;
+  ctx.beginPath();
+  ctx.arc(pupilX-w*.055, pupilY-h*.12, 7, 0, Math.PI*2);
+  ctx.fill();
+
+  // Mí trên trong biểu cảm buồn ngủ / giận dữ / tập trung
+  if (["angry", "focused", "sleepy", "sad"].includes(expression)) {
+    ctx.fillStyle = "#030914";
+    ctx.beginPath();
+
+    if (expression === "angry" || expression === "focused") {
+      // Mí nghiêng tạo cảm giác sắc nét
+      ctx.moveTo(-w*.52, -h*.05);
+      ctx.lineTo(w*.52, -h*.48);
+      ctx.lineTo(w*.52, -h*.72);
+      ctx.lineTo(-w*.52, -h*.35);
+    } else {
+      ctx.moveTo(-w*.5, -h*.12);
+      ctx.quadraticCurveTo(0, -h*.85, w*.5, -h*.12);
+      ctx.lineTo(w*.5, -h*.5);
+      ctx.lineTo(-w*.5, -h*.5);
+    }
+
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function drawClosedSmileEye(w, h, laughing) {
+  ctx.save();
+
+  ctx.strokeStyle = CYAN;
+  ctx.lineWidth = laughing ? 12 : 10;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  glow(CYAN, 20);
+
+  ctx.beginPath();
+  ctx.moveTo(-w*.43, h*.15);
+  ctx.quadraticCurveTo(0, laughing ? -h*.85 : -h*.65, w*.43, h*.15);
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function drawHeart(x, y, size) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size, size);
+
+  ctx.fillStyle = "#ff78bc";
+  glow("#ff78bc", 18);
+
+  ctx.beginPath();
+  ctx.moveTo(0, .35);
+  ctx.bezierCurveTo(-1, -.2, -1, -.85, 0, -.45);
+  ctx.bezierCurveTo(1, -.85, 1, -.2, 0, .35);
+  ctx.fill();
+
+  ctx.restore();
+}
+
+function drawEyebrows() {
+  ctx.save();
+
+  const left = 375;
+  const right = 625;
+  const y = 220;
+
+  let color = CYAN;
+  let width = 9;
+
+  if (expression === "angry") {
+    color = "#ff718b";
+    width = 10;
+  }
+
+  if (expression === "sad") {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    glow(color, 15);
+
+    ctx.beginPath();
+    ctx.moveTo(left-55, y+8);
+    ctx.quadraticCurveTo(left, y-22, left+55, y+10);
+    ctx.moveTo(right-55, y+10);
+    ctx.quadraticCurveTo(right, y-22, right+55, y+8);
+    ctx.stroke();
+  }
+
+  if (expression === "angry") {
+    // Hai chân mày cau vào giữa, đối xứng
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    glow(color, 18);
+
+    ctx.beginPath();
+
+    ctx.moveTo(left-55, y+10);
+    ctx.quadraticCurveTo(left+5, y+4, left+65, y+48);
+
+    ctx.moveTo(right+55, y+10);
+    ctx.quadraticCurveTo(right-5, y+4, right-65, y+48);
+
+    ctx.stroke();
+  }
+
+  if (expression === "surprised") {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 8;
+    ctx.lineCap = "round";
+    glow(color, 14);
+
+    ctx.beginPath();
+    ctx.arc(left, y+5, 43, Math.PI*1.1, Math.PI*1.9);
+    ctx.moveTo(right-43, y+5);
+    ctx.arc(right, y+5, 43, Math.PI*1.1, Math.PI*1.9);
+    ctx.stroke();
+  }
+
+  if (expression === "focused") {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 8;
+    ctx.lineCap = "round";
+    glow(color, 12);
+
+    ctx.beginPath();
+    ctx.moveTo(left-50, y+5);
+    ctx.lineTo(left+48, y+20);
+    ctx.moveTo(right-48, y+20);
+    ctx.lineTo(right+50, y+5);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawMouth(t) {
+  ctx.save();
+
+  const y = 420;
+  let color = CYAN;
+  let width = 8;
+
+  if (expression === "angry") color = "#ff718b";
+  if (expression === "love") color = "#ff78bc";
+
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = width;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  glow(color, 18);
+
+  switch (expression) {
+    case "happy":
+    case "laugh":
+      // Nụ cười thân thiện
+      ctx.beginPath();
+      ctx.moveTo(455, y);
+      ctx.quadraticCurveTo(500, y+48, 545, y);
+      ctx.stroke();
+
+      if (expression === "laugh") {
+        ctx.fillStyle = "#35d9ff";
+        roundedRect(477, y+7, 46, 24, 12);
+        ctx.fill();
+      }
+      break;
+
+    case "sad":
+      ctx.beginPath();
+      ctx.moveTo(462, y+20);
+      ctx.quadraticCurveTo(500, y-20, 538, y+20);
+      ctx.stroke();
+      break;
+
+    case "angry":
+      ctx.beginPath();
+      ctx.moveTo(472, y+7);
+      ctx.lineTo(528, y+7);
+      ctx.stroke();
+      break;
+
+    case "surprised":
+      ctx.beginPath();
+      ctx.ellipse(500, y+8, 17, 25, 0, 0, Math.PI*2);
+      ctx.fill();
+      break;
+
+    case "sleepy":
+      ctx.beginPath();
+      ctx.ellipse(500, y+5, 12, 5, 0, 0, Math.PI*2);
+      ctx.stroke();
+      break;
+
+    case "focused":
+      ctx.beginPath();
+      ctx.moveTo(480, y+5);
+      ctx.lineTo(520, y+5);
+      ctx.stroke();
+      break;
+
+    case "wink":
+    case "curious":
+    case "neutral":
+    case "excited":
+      ctx.beginPath();
+      ctx.moveTo(465, y);
+      ctx.quadraticCurveTo(500, y+27, 535, y);
+      ctx.stroke();
+      break;
+
+    case "love":
+      ctx.beginPath();
+      ctx.moveTo(465, y);
+      ctx.quadraticCurveTo(500, y+35, 535, y);
+      ctx.stroke();
+      break;
+  }
+
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function drawFaceDetails(t) {
+  // Đèn trạng thái hai bên mặt
+  ctx.save();
+
+  const pulse = .55 + Math.sin(t*.004)*.25;
+  ctx.globalAlpha = pulse;
+  ctx.fillStyle = CYAN;
+  glow(CYAN, 14);
+
+  for (const x of [245, 755]) {
+    ctx.beginPath();
+    ctx.arc(x, 470, 4, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+
+  // Các chấm trang trí dưới cằm
+  ctx.save();
+  ctx.fillStyle = "rgba(53,217,255,.5)";
+  for (let i=0; i<5; i++) {
+    ctx.beginPath();
+    ctx.arc(480+i*10, 558, 2, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawFace(t) {
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.scale(scale, scale);
+
+  drawMetalFrame(t);
+
+  const float = Math.sin(t*.0012)*2;
+
+  drawEyebrows();
+
+  if (expression === "love") {
+    drawHeart(375, 315+float, 35);
+    drawHeart(625, 315+float, 35);
+  } else {
+    drawEye(375, 320+float, "left", t);
+    drawEye(625, 320+float, "right", t);
+  }
+
+  drawMouth(t);
+  drawFaceDetails(t);
+
+  // Sparkle khi phấn khích
+  if (expression === "excited" || expression === "love") {
+    ctx.save();
+    ctx.fillStyle = CYAN;
+    glow(CYAN, 15);
+
+    const sparkle = .4 + Math.sin(t*.008)*.4;
+    ctx.globalAlpha = sparkle;
+
+    for (let i=0; i<4; i++) {
+      const x = 300 + i*130;
+      const y = 190 + Math.sin(t*.002+i)*12;
+
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+function setExpression(mood, duration = 0) {
+  const valid = [
+    "neutral", "happy", "sad", "angry",
+    "laugh", "excited", "sleepy", "curious",
+    "surprised", "wink", "focused", "love"
+  ];
+
+  if (!valid.includes(mood)) mood = "neutral";
+
+  expression = mood;
+  blinkTarget = 1;
+
+  expressionUntil = duration > 0
+    ? performance.now() + duration
+    : 0;
+}
+
+function randomIdleExpression(now) {
+  if (guestPresent || photoboothActive || now < nextIdleChange) return;
+
+  const choices = [
+    ["neutral", 3000],
+    ["curious", 1700],
+    ["sleepy", 1600],
+    ["wink", 1000],
+    ["happy", 1800]
+  ];
+
+  const choice = choices[Math.floor(Math.random()*choices.length)];
+  setExpression(choice[0], choice[1]);
+
+  nextIdleChange = now + 5000 + Math.random()*5000;
+}
+
+function updateAnimation(t) {
+  randomIdleExpression(t);
+
+  if (expressionUntil > 0 && t > expressionUntil &&
+      !guestPresent && !photoboothActive) {
+    setExpression("neutral");
+    expressionUntil = 0;
+  }
+
+  if (t-lastGazeChange > 3500 + Math.random()*1800) {
+    if (!guestPresent && !photoboothActive) {
+      targetGazeX = (Math.random()-.5)*.7;
+      targetGazeY = (Math.random()-.5)*.4;
+    }
+    lastGazeChange = t;
+  }
+
+  gazeX += (targetGazeX-gazeX)*.055;
+  gazeY += (targetGazeY-gazeY)*.055;
+
+  blink += (blinkTarget-blink)*.3;
+}
+
+function animate(t) {
+  drawBackground(t);
+
+  updateAnimation(t);
+
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  drawFace(t);
+  ctx.restore();
+
+  requestAnimationFrame(animate);
+}
+
+function scheduleBlink() {
+  const delay = 2300 + Math.random()*2800;
+
+  setTimeout(() => {
+    if (expression !== "laugh" && expression !== "sleepy") {
+      blinkTarget = .04;
+
+      setTimeout(() => {
+        blinkTarget = 1;
+      }, 140);
+    }
+
+    scheduleBlink();
+  }, delay);
+}
+
+scheduleBlink();
+
+// KẾT NỐI ROBOT SERVER
+let socket;
+let reconnectTimer;
+
+function connectServer() {
+  const host = window.location.hostname || "127.0.0.1";
+  const socketUrl = `ws://${host}:3002`;
+
+  socket = new WebSocket(socketUrl);
+
+  socket.onopen = () => {
+    connection.classList.add("connected");
+    connectionText.textContent = "CONNECTED";
+    console.log("Robot Server connected:", socketUrl);
+  };
+
+  socket.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+
+      // Nhận biểu cảm trực tiếp từ Camera AI
+      if (data.expression) {
+        setExpression(data.expression);
+      }
+
+      // Nhận diện khách
+      if (data.type === "presence") {
+        guestPresent = !!data.present;
+
+        if (guestPresent) {
+          targetGazeX = 0;
+          targetGazeY = 0;
+          setExpression("happy");
+        } else if (!photoboothActive) {
+          setExpression("neutral");
+          nextIdleChange = performance.now()+2500;
+        }
+      }
+
+      // Nhận trạng thái Photobooth
+      if (data.type === "photobooth") {
+        if (data.stage === "countdown") {
+          photoboothActive = true;
+          setExpression("focused");
+        }
+
+        if (data.stage === "captured") {
+          photoboothActive = true;
+          setExpression("laugh");
+        }
+
+        if (data.stage === "finished") {
+          photoboothActive = false;
+          setExpression(guestPresent ? "happy" : "neutral");
+          nextIdleChange = performance.now()+3000;
+        }
+      }
+
+    } catch (error) {
+      console.error("WebSocket message error:", error);
+    }
+  };
+
+  socket.onclose = () => {
+    connection.classList.remove("connected");
+    connectionText.textContent = "RECONNECTING";
+
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connectServer, 2000);
+  };
+
+  socket.onerror = () => socket.close();
+}
+
+connectServer();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
