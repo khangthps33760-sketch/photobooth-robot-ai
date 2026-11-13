@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "scripts": {
+"scripts": {
   "dev": "vite --host 0.0.0.0",
   "server": "node server/robot-server.js",
+  "start": "node server/robot-server.js",
   "build": "vite build",
   "preview": "vite preview --host 0.0.0.0"
 },
