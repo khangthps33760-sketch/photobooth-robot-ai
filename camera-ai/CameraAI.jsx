@@ -7,13 +7,16 @@ export default function CameraAI() {
   const landmarkerRef = useRef(null);
   const socketRef = useRef(null);
   const streamRef = useRef(null);
-
+  const voiceGreetingEnabledRef = useRef(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [faceDetected, setFaceDetected] = useState(false);
   const [status, setStatus] = useState("Đang khởi tạo...");
   const [expression, setExpression] = useState("neutral");
   const [direction, setDirection] = useState("Chưa nhận diện");
-
+  const [voiceGreetingEnabled, setVoiceGreetingEnabled] = useState(false);
+  useEffect(() => {
+  voiceGreetingEnabledRef.current = voiceGreetingEnabled;
+}, [voiceGreetingEnabled]);
   useEffect(() => {
     let active = true;
     let animationId;
@@ -68,9 +71,24 @@ export default function CameraAI() {
         sendExpression("neutral");
         setStatus("Đang tìm kiếm khuôn mặt...");
       } else {
-        setDirection("Đang quan sát hướng nhìn");
-        setStatus("Đã nhận diện khách!");
-      }
+  setDirection("Đang quan sát hướng nhìn");
+  setStatus("Đã nhận diện khách!");
+
+  // Chào khách nếu chức năng giọng nói đang bật
+  if (voiceGreetingEnabledRef.current) {
+    const speech = new SpeechSynthesisUtterance(
+      "Xin chào! Chào mừng bạn đến với Photobooth. Bạn có muốn chụp một tấm ảnh thật đẹp không?"
+    );
+
+    speech.lang = "vi-VN";
+    speech.rate = 0.9;
+    speech.pitch = 1.3;
+    speech.volume = 1;
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(speech);
+  }
+}
     }
 
     function estimateHeadTurn(landmarks) {
@@ -218,13 +236,8 @@ export default function CameraAI() {
 }
         
         else if (awaySince !== null) {
-          const awayDuration = now - awaySince;
-
-          if (awayDuration >= 5000) {
-            sendExpression("angry");
-          } else if (awayDuration >= 2000) {
-            sendExpression("sad");
-          }
+          // Giữ biểu cảm thân thiện khi khách quay mặt đi.
+          sendExpression("happy");
         }
       }
 
@@ -362,6 +375,51 @@ export default function CameraAI() {
       </div>
 
       <div style={styles.info}>
+                <div style={styles.settingsPanel}>
+          <h3>CÀI ĐẶT ROBOT AI</h3>
+
+          <div style={styles.settingRow}>
+            <div>
+              <strong>Chào khách bằng giọng nói</strong>
+              <p>Tự động chào khi phát hiện khách mới</p>
+            </div>
+
+            <button
+              onClick={() =>
+                setVoiceGreetingEnabled((prev) => !prev)
+              }
+              style={{
+                ...styles.toggleButton,
+                background: voiceGreetingEnabled ? "#00c781" : "#475569",
+              }}
+            >
+              {voiceGreetingEnabled ? "ON" : "OFF"}
+            </button>
+          </div>
+        </div>
+        <button
+  onClick={() => {
+    window.speechSynthesis.cancel();
+
+    const speech = new SpeechSynthesisUtterance(
+      "Hello! Xin chàooo! Chào mừng bạn đến với Photobooth nha!"
+    );
+
+    speech.lang = "vi-VN";
+    speech.rate = 0.9;
+    speech.pitch = 1.3;
+    speech.volume = 1;
+
+    window.speechSynthesis.speak(speech);
+  }}
+  style={{
+    ...styles.toggleButton,
+    background: "#087ea4",
+    marginTop: "12px",
+  }}
+>
+  TEST GIỌNG NÓI
+</button>
         <div style={styles.status}>
           <span
             style={{
@@ -443,5 +501,31 @@ const styles = {
     borderRadius: "12px",
     fontSize: "14px",
     lineHeight: 1.5,
+  },
+  settingsPanel: {
+    width: "100%",
+    maxWidth: "640px",
+    padding: "16px",
+    background: "#10243b",
+    border: "1px solid #24415f",
+    borderRadius: "12px",
+    boxSizing: "border-box",
+  },
+
+  settingRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "12px",
+  },
+
+  toggleButton: {
+    minWidth: "65px",
+    padding: "10px 16px",
+    border: "none",
+    borderRadius: "20px",
+    color: "white",
+    fontWeight: "bold",
+    cursor: "pointer",
   },
 };
