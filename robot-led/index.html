@@ -108,11 +108,29 @@ const DESIGN_W = 1000;
 const DESIGN_H = 650;
 
 let expression = "neutral";
+let previousExpression = "neutral";
+let expressionTransition = 1;
 let blink = 1;
 let blinkTarget = 1;
+// Micro Expression - Eyebrow Animation
+// Micro Expression - Eyebrow Animation
+let eyebrowOffset = 0;
+let targetEyebrowOffset = 0;
 
+let eyebrowLeftOffset = 0;
+let eyebrowRightOffset = 0;
+
+let targetEyebrowLeft = 0;
+let targetEyebrowRight = 0;
+
+let nextEyebrowMove = 0;
 let gazeX = 0;
 let gazeY = 0;
+let idleEyeOffsetX = 0;
+let idleEyeOffsetY = 0;
+let nextIdleEyeMove = 0;
+let targetIdleEyeX = 0;
+let targetIdleEyeY = 0;
 let targetGazeX = 0;
 let targetGazeY = 0;
 
@@ -154,8 +172,10 @@ function glow(color, blur) {
 }
 
 function drawBackground(t) {
-  ctx.clearRect(0, 0, W, H);
-
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Khôi phục tỷ lệ hiển thị theo màn hình
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const cx = W / 2;
   const cy = H / 2;
   const pulse = 0.09 + Math.sin(t * 0.0015) * 0.025;
@@ -348,7 +368,43 @@ function getEyeStyle(side) {
 
   return { open, tilt, eyeScaleX, eyeScaleY };
 }
+  function drawSleepyEye(w, side) {
+  ctx.save();
 
+  ctx.strokeStyle = CYAN;
+  ctx.lineWidth = 7;
+  ctx.lineCap = "round";
+  ctx.shadowColor = CYAN;
+  ctx.shadowBlur = 14;
+
+  // Mí mắt khép tự nhiên
+  ctx.beginPath();
+  ctx.moveTo(-w * 0.72, 3);
+
+  ctx.quadraticCurveTo(
+    0,
+    22,
+    w * 0.72,
+    3
+  );
+
+  ctx.stroke();
+
+  // Một chút lông mi ở phía ngoài
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+
+  if (side === "left") {
+    ctx.moveTo(-w * 0.55, 8);
+    ctx.lineTo(-w * 0.68, 17);
+  } else {
+    ctx.moveTo(w * 0.55, 8);
+    ctx.lineTo(w * 0.68, 17);
+  }
+
+  ctx.stroke();
+  ctx.restore();
+}
 function drawEye(x, y, side, t) {
   const s = getEyeStyle(side);
 
@@ -371,13 +427,15 @@ function drawEye(x, y, side, t) {
   ctx.fill();
 
   // Hình dạng mắt
-  if (expression === "laugh" || expression === "happy") {
-    drawClosedSmileEye(eyeW, eyeH, expression === "laugh");
-  } else if (expression === "love") {
-    drawHeart(0, 0, 34);
-  } else {
-    drawOpenEye(eyeW, eyeH, side, t);
-  }
+  if (expression === "sleepy") {
+  drawSleepyEye(eyeW, side);
+} else if (expression === "laugh" || expression === "happy") {
+  drawClosedSmileEye(eyeW, eyeH, expression === "laugh");
+} else if (expression === "love") {
+  drawHeart(0, 0, 34);
+} else {
+  drawOpenEye(eyeW, eyeH, side, t);
+}
 
   ctx.restore();
 }
@@ -386,13 +444,12 @@ function drawEye(x, y, side, t) {
 function drawOpenEye(w, h, side, t) {
   ctx.save();
 
-  const pupilX = gazeX * w * 0.15;
-  const pupilY = gazeY * h * 0.15;
+  const pupilX = (gazeX + idleEyeOffsetX) * w * 0.15;
+  const pupilY = (gazeY + idleEyeOffsetY) * h * 0.15;
 
   // Hình dáng mắt tự nhiên hơn
-  const eyeW = w * 0.44;
-  const eyeH = h * 0.46;
-
+  const eyeW = w * (expression === "surprised" ? 0.48 : 0.44);
+  const eyeH = h * (expression === "surprised" ? 0.56 : 0.46);
   // Lớp ánh sáng bên ngoài
   ctx.shadowColor = CYAN;
   ctx.shadowBlur = 25;
@@ -416,6 +473,79 @@ function drawOpenEye(w, h, side, t) {
   // Viền mắt trong suốt
   ctx.strokeStyle = "rgba(255,255,255,0.55)";
   ctx.lineWidth = 2;
+  // NƯỚC MẮT CHẢY KHI BUỒN
+if (expression === "sad") {
+  const tearX = side === "left"
+    ? -eyeW * 0.72
+    : eyeW * 0.72;
+
+// Nước mắt chảy xuống rồi đọng lại
+const tearCycle =
+  (t * 0.045 + (side === "right" ? 18 : 0)) % 54;
+
+// Chảy 36 đơn vị, sau đó dừng lại 18 đơn vị
+const tearProgress = Math.min(tearCycle, 36);
+
+const tearY = eyeH * 0.28 + tearProgress;
+
+  ctx.save();
+
+  ctx.shadowColor = "#00DFFF";
+  ctx.shadowBlur = 16;
+
+  const tearGradient = ctx.createLinearGradient(
+    tearX, tearY - 12,
+    tearX, tearY + 14
+  );
+
+  tearGradient.addColorStop(0, "#D9FFFF");
+  tearGradient.addColorStop(0.45, "#42E8FF");
+  tearGradient.addColorStop(1, "#0788BF");
+
+  ctx.fillStyle = tearGradient;
+
+  // Hình giọt nước
+  ctx.beginPath();
+  ctx.moveTo(tearX, tearY - 12);
+
+  ctx.bezierCurveTo(
+    tearX - 5, tearY - 5,
+    tearX - 8, tearY + 3,
+    tearX - 6, tearY + 7
+  );
+
+  ctx.quadraticCurveTo(
+    tearX, tearY + 17,
+    tearX + 6, tearY + 7
+  );
+
+  ctx.bezierCurveTo(
+    tearX + 8, tearY + 3,
+    tearX + 5, tearY - 5,
+    tearX, tearY - 12
+  );
+
+  ctx.closePath();
+  ctx.fill();
+
+  // Ánh sáng phản chiếu trên giọt nước
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "rgba(255,255,255,0.85)";
+
+  ctx.beginPath();
+  ctx.ellipse(
+    tearX - 2,
+    tearY + 2,
+    1.8,
+    4,
+    -0.3,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  ctx.restore();
+}
   ctx.stroke();
 
   // Đồng tử
@@ -437,7 +567,8 @@ function drawOpenEye(w, h, side, t) {
   ctx.beginPath();
   ctx.ellipse(
     pupilX, pupilY,
-    w * 0.19, h * 0.29,
+    w * (expression === "surprised" ? 0.15 : 0.19),
+    h * (expression === "surprised" ? 0.23 : 0.29),
     0, 0, Math.PI * 2
   );
   ctx.fill();
@@ -468,21 +599,46 @@ function drawOpenEye(w, h, side, t) {
   ctx.restore();
 
   // Mí mắt theo biểu cảm
-  if (["angry", "focused", "sleepy", "sad"].includes(expression)) {
+  if (["angry", "focused", "sleepy"].includes(expression)) {
     ctx.fillStyle = "#030914";
     ctx.beginPath();
 
-    if (expression === "angry" || expression === "focused") {
-      ctx.moveTo(-w * 0.52, -h * 0.05);
-      ctx.lineTo(w * 0.52, -h * 0.48);
-      ctx.lineTo(w * 0.52, -h * 0.72);
-      ctx.lineTo(-w * 0.52, -h * 0.35);
-    } else {
-      ctx.moveTo(-w * 0.5, -h * 0.12);
-      ctx.quadraticCurveTo(0, -h * 0.85, w * 0.5, -h * 0.12);
-      ctx.lineTo(w * 0.5, -h * 0.5);
-      ctx.lineTo(-w * 0.5, -h * 0.5);
-    }
+    if (expression === "angry") {
+  ctx.beginPath();
+      if (side === "left") {
+  ctx.moveTo(-w * 0.52, -h * 0.42);
+  ctx.lineTo(w * 0.52, -h * 0.02);
+  ctx.lineTo(w * 0.52, -h * 0.48);
+  ctx.lineTo(-w * 0.52, -h * 0.62);
+} else {
+  ctx.moveTo(-w * 0.52, -h * 0.02);
+  ctx.lineTo(w * 0.52, -h * 0.42);
+  ctx.lineTo(w * 0.52, -h * 0.62);
+  ctx.lineTo(-w * 0.52, -h * 0.48);
+}
+} else if (expression === "focused") {
+  // Mí mắt tập trung: thấp nhẹ, gần ngang và mỏng
+  ctx.moveTo(-w * 0.52, -h * 0.18);
+  ctx.quadraticCurveTo(
+    0,
+    -h * 0.28,
+    w * 0.52,
+    -h * 0.18
+  );
+
+  ctx.lineTo(w * 0.52, -h * 0.38);
+  ctx.quadraticCurveTo(
+    0,
+    -h * 0.48,
+    -w * 0.52,
+    -h * 0.38
+  );
+} else {
+  ctx.moveTo(-w * 0.5, -h * 0.12);
+  ctx.quadraticCurveTo(0, -h * 0.85, w * 0.5, -h * 0.12);
+  ctx.lineTo(w * 0.5, -h * 0.5);
+  ctx.lineTo(-w * 0.5, -h * 0.5);
+}
 
     ctx.closePath();
     ctx.fill();
@@ -527,12 +683,15 @@ function drawHeart(x, y, size) {
 }
 
 
+
 function drawEyebrows() {
   ctx.save();
 
   const left = 375;
   const right = 625;
-  const y = 220;
+
+  const leftY = 220 + eyebrowOffset + eyebrowLeftOffset;
+  const rightY = 220 + eyebrowOffset + eyebrowRightOffset;
 
   let color = CYAN;
   let width = 8;
@@ -549,60 +708,198 @@ function drawEyebrows() {
   ctx.beginPath();
 
   if (expression === "angry") {
-    // Chân mày cau mạnh vào giữa
-    ctx.moveTo(left - 55, y - 2);
-    ctx.quadraticCurveTo(left + 5, y + 2, left + 55, y + 35);
+    ctx.moveTo(left - 55, leftY - 2);
+    ctx.quadraticCurveTo(left + 5, leftY + 2, left + 55, leftY + 35);
 
-    ctx.moveTo(right + 55, y - 2);
-    ctx.quadraticCurveTo(right - 5, y + 2, right - 55, y + 35);
+    ctx.moveTo(right + 55, rightY - 2);
+    ctx.quadraticCurveTo(right - 5, rightY + 2, right - 55, rightY + 35);
   }
   else if (expression === "sad") {
-    // Phần giữa chân mày nâng lên
-    ctx.moveTo(left - 55, y + 15);
-    ctx.quadraticCurveTo(left, y - 25, left + 55, y + 18);
+    ctx.moveTo(left - 55, leftY + 15);
+    ctx.quadraticCurveTo(left, leftY - 25, left + 55, leftY + 18);
 
-    ctx.moveTo(right - 55, y + 18);
-    ctx.quadraticCurveTo(right, y - 25, right + 55, y + 15);
+    ctx.moveTo(right - 55, rightY + 18);
+    ctx.quadraticCurveTo(right, rightY - 25, right + 55, rightY + 15);
   }
   else if (expression === "surprised") {
-    ctx.arc(left, y + 5, 43, Math.PI * 1.1, Math.PI * 1.9);
-    ctx.moveTo(right - 43, y + 5);
-    ctx.arc(right, y + 5, 43, Math.PI * 1.1, Math.PI * 1.9);
-  }
+  // Lông mày trái: nhướng cao, cong tròn
+  ctx.moveTo(left - 48, leftY - 8);
+  ctx.quadraticCurveTo(
+    left,
+    leftY - 55,
+    left + 48,
+    leftY - 8
+  );
+
+  // Lông mày phải: đối xứng
+  ctx.moveTo(right - 48, rightY - 8);
+  ctx.quadraticCurveTo(
+    right,
+    rightY - 55,
+    right + 48,
+    rightY - 8
+  );
+}
   else if (expression === "focused") {
-    ctx.moveTo(left - 50, y + 5);
-    ctx.lineTo(left + 48, y + 20);
-    ctx.moveTo(right - 48, y + 20);
-    ctx.lineTo(right + 50, y + 5);
+    ctx.moveTo(left - 50, leftY + 5);
+    ctx.lineTo(left + 48, leftY + 20);
+
+    ctx.moveTo(right - 48, rightY + 20);
+    ctx.lineTo(right + 50, rightY + 5);
   }
   else if (expression === "sleepy") {
-    ctx.moveTo(left - 50, y + 12);
-    ctx.quadraticCurveTo(left, y + 2, left + 50, y + 12);
-    ctx.moveTo(right - 50, y + 12);
-    ctx.quadraticCurveTo(right, y + 2, right + 50, y + 12);
+    ctx.moveTo(left - 50, leftY + 12);
+    ctx.quadraticCurveTo(left, leftY + 2, left + 50, leftY + 12);
+
+    ctx.moveTo(right - 50, rightY + 12);
+    ctx.quadraticCurveTo(right, rightY + 2, right + 50, rightY + 12);
   }
   else {
-    // Chân mày thư giãn
-    ctx.moveTo(left - 48, y + 12);
-    ctx.quadraticCurveTo(left, y - 5, left + 48, y + 12);
+    ctx.moveTo(left - 48, leftY + 12);
+    ctx.quadraticCurveTo(left, leftY - 5, left + 48, leftY + 12);
 
-    ctx.moveTo(right - 48, y + 12);
-    ctx.quadraticCurveTo(right, y - 5, right + 48, y + 12);
+    ctx.moveTo(right - 48, rightY + 12);
+    ctx.quadraticCurveTo(right, rightY - 5, right + 48, rightY + 12);
   }
 
   ctx.stroke();
   ctx.restore();
 }
+function drawSleepBubble(t) {
+  if (expression !== "sleepy") return;
 
+  // Bong bóng phồng lên và xẹp xuống
+  const breathe = (Math.sin(t * 0.002) + 1) / 2;
 
+  const radius = 7 + breathe * 13;
+  const x = 550;
+  const y = 365;
+
+  ctx.save();
+
+  // Bong bóng phát sáng
+  ctx.shadowColor = "#35D9FF";
+  ctx.shadowBlur = 18;
+
+  const gradient = ctx.createRadialGradient(
+    x - radius * 0.35,
+    y - radius * 0.4,
+    1,
+    x,
+    y,
+    radius
+  );
+
+  gradient.addColorStop(0, "rgba(255,255,255,0.9)");
+  gradient.addColorStop(0.35, "rgba(53,217,255,0.45)");
+  gradient.addColorStop(1, "rgba(0,180,255,0.12)");
+
+  ctx.fillStyle = gradient;
+  ctx.strokeStyle = "#35D9FF";
+  ctx.lineWidth = 2.5;
+
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Điểm sáng phản chiếu
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = "#FFFFFF";
+
+  ctx.beginPath();
+  ctx.arc(
+    x - radius * 0.35,
+    y - radius * 0.35,
+    Math.max(1.5, radius * 0.15),
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+
+  // Bong bóng nhỏ nối với bong bóng chính
+  ctx.fillStyle = "rgba(53,217,255,0.6)";
+  ctx.beginPath();
+  ctx.arc(x - 18, y + 19, 3 + breathe * 2, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
 function drawMouth(t) {
   ctx.save();
 
   const y = 420;
+  const talking = window.robotTalking === true;
+
   let color = CYAN;
 
   if (expression === "angry") color = "#ff718b";
   if (expression === "love") color = "#ff78bc";
+
+  // Miệng mở có răng và lưỡi
+  function drawOpenMouth(openAmount = 1) {
+    const mouthW = 48;
+    const mouthH = 25 * openAmount;
+
+    ctx.save();
+
+    // Khoang miệng
+    ctx.shadowColor = "#ff78bc";
+    ctx.shadowBlur = 16;
+    ctx.fillStyle = "#5c1739";
+
+    ctx.beginPath();
+    ctx.moveTo(500 - mouthW, y);
+    ctx.quadraticCurveTo(
+      500, y - 12,
+      500 + mouthW, y
+    );
+    ctx.quadraticCurveTo(
+      500 + mouthW * 0.9,
+      y + mouthH * 2,
+      500,
+      y + mouthH * 2
+    );
+    ctx.quadraticCurveTo(
+      500 - mouthW * 0.9,
+      y + mouthH * 2,
+      500 - mouthW,
+      y
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.shadowBlur = 0;
+
+    // Răng trắng phía trên
+    ctx.fillStyle = "#FFFFFF";
+    roundedRect(468, y - 2, 64, 19, 8);
+    ctx.fill();
+
+    // Đường phân chia răng
+    ctx.strokeStyle = "#dcefff";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(500, y);
+    ctx.lineTo(500, y + 13);
+    ctx.stroke();
+
+    // Lưỡi hồng phía dưới
+    ctx.fillStyle = "#ff75a9";
+    ctx.beginPath();
+    ctx.ellipse(
+      500,
+      y + mouthH * 1.65,
+      25,
+      10 * openAmount,
+      0,
+      Math.PI,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    ctx.restore();
+  }
 
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
@@ -613,26 +910,48 @@ function drawMouth(t) {
 
   switch (expression) {
     case "happy":
-    case "laugh":
-    case "excited": {
-      const smile = expression === "laugh" ? 55 : 42;
-
+    case "wink":
       ctx.beginPath();
       ctx.moveTo(455, y);
-      ctx.quadraticCurveTo(500, y + smile, 545, y);
+      ctx.quadraticCurveTo(500, y + 42, 545, y);
       ctx.stroke();
-
-      if (expression === "laugh") {
-        ctx.fillStyle = "#35d9ff";
-        ctx.beginPath();
-        ctx.ellipse(500, y + 20, 25, 15, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
       break;
-    }
+
+    case "laugh":
+      drawOpenMouth(1.25);
+      break;
+
+    case "excited":
+      drawOpenMouth(1.05);
+      break;
+
+    case "surprised":
+  // Khoang miệng hình chữ O
+  ctx.fillStyle = "#5c1739";
+  ctx.shadowColor = "#ff78bc";
+  ctx.shadowBlur = 16;
+
+  ctx.beginPath();
+  ctx.ellipse(500, y + 10, 29, 34, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.shadowBlur = 0;
+
+  // Viền sáng bên ngoài
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.ellipse(500, y + 10, 29, 34, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Lưỡi hồng bên trong
+  ctx.fillStyle = "#ff75a9";
+  ctx.beginPath();
+  ctx.ellipse(500, y + 29, 16, 9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  break;
 
     case "sad":
-      // Khóe miệng hạ xuống
       ctx.beginPath();
       ctx.moveTo(455, y + 18);
       ctx.quadraticCurveTo(500, y - 30, 545, y + 18);
@@ -640,19 +959,44 @@ function drawMouth(t) {
       break;
 
     case "angry":
-      // Miệng mím, hơi trễ xuống ở giữa
-      ctx.beginPath();
-      ctx.moveTo(470, y + 8);
-      ctx.quadraticCurveTo(500, y + 22, 530, y + 8);
-      ctx.stroke();
-      break;
+  // Khoang miệng
+  ctx.save();
 
-    case "surprised":
-      ctx.beginPath();
-      ctx.ellipse(500, y + 8, 19, 27, 0, 0, Math.PI * 2);
-      ctx.fill();
-      break;
+  ctx.fillStyle = "#5c1739";
+  ctx.beginPath();
+  ctx.moveTo(460, y + 3);
+  ctx.quadraticCurveTo(500, y + 17, 540, y + 3);
+  ctx.lineTo(535, y + 25);
+  ctx.quadraticCurveTo(500, y + 33, 465, y + 25);
+  ctx.closePath();
+  ctx.fill();
 
+  // Giới hạn vùng vẽ răng bên trong khoang miệng
+  ctx.clip();
+
+  // Răng trắng
+  ctx.fillStyle = "#FFFFFF";
+  roundedRect(470, y + 3, 60, 12, 4);
+  ctx.fill();
+
+  // Đường phân chia răng
+  ctx.strokeStyle = "#dcefff";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(500, y + 3);
+  ctx.lineTo(500, y + 15);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Viền miệng
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.moveTo(460, y + 3);
+  ctx.quadraticCurveTo(500, y + 34, 540, y + 3);
+  ctx.stroke();
+  break;
     case "sleepy":
       ctx.beginPath();
       ctx.ellipse(500, y + 8, 15, 6, 0, 0, Math.PI * 2);
@@ -673,9 +1017,6 @@ function drawMouth(t) {
       ctx.stroke();
       break;
 
-    case "wink":
-    case "curious":
-    case "neutral":
     default:
       ctx.beginPath();
       ctx.moveTo(465, y);
@@ -687,6 +1028,7 @@ function drawMouth(t) {
   ctx.shadowBlur = 0;
   ctx.restore();
 }
+
 
 function drawFaceDetails(t) {
   // Đèn trạng thái hai bên mặt
@@ -715,7 +1057,31 @@ function drawFaceDetails(t) {
   }
   ctx.restore();
 }
+function drawExpressionLayer(t, float, mood, alpha) {
+  const savedExpression = expression;
+  expression = mood;
 
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+
+  drawGoldenRays(t);
+  drawEyebrows();
+  drawCheeks(t);
+
+  if (expression === "love") {
+    drawHeart(375, 315 + float, 35);
+    drawHeart(625, 315 + float, 35);
+  } else {
+    drawEye(375, 320 + float, "left", t);
+    drawEye(625, 320 + float, "right", t);
+  }
+
+  drawMouth(t);
+  drawSleepBubble(t);
+
+  ctx.restore();
+  expression = savedExpression;
+}
 function drawFace(t) {
   ctx.save();
   ctx.translate(offsetX, offsetY);
@@ -723,20 +1089,30 @@ function drawFace(t) {
 
   drawMetalFrame(t);
 
-  const float = Math.sin(t*.0012)*2;
+const float = Math.sin(t * .0012) * 2;
 
-  drawEyebrows();
+// Chuyển tiếp giữa biểu cảm cũ và mới
+// Ease-out: chuyển nhanh lúc đầu, nhẹ nhàng khi kết thúc
+const transitionProgress =
+  1 - Math.pow(1 - expressionTransition, 3);
 
-  if (expression === "love") {
-    drawHeart(375, 315+float, 35);
-    drawHeart(625, 315+float, 35);
-  } else {
-    drawEye(375, 320+float, "left", t);
-    drawEye(625, 320+float, "right", t);
-  }
+if (transitionProgress < 1) {
+  drawExpressionLayer(
+    t,
+    float,
+    previousExpression,
+    1 - transitionProgress
+  );
+}
 
-  drawMouth(t);
-  drawFaceDetails(t);
+drawExpressionLayer(
+  t,
+  float,
+  expression,
+  transitionProgress
+);
+
+drawFaceDetails(t);
 
   // Sparkle khi phấn khích
   if (expression === "excited" || expression === "love") {
@@ -762,6 +1138,78 @@ function drawFace(t) {
   ctx.restore();
 }
 
+// MÁ HỒNG CUTE PREMIUM
+function drawCheeks(t) {
+  const blushOpacity =
+    expression === "love" || expression === "happy" ||
+    expression === "laugh" || expression === "excited" ||
+    expression === "wink"
+      ? 0.85
+      : 0.45;
+
+  const pulse = 0.85 + Math.sin(t * 0.003) * 0.15;
+
+  ctx.save();
+  ctx.globalAlpha = blushOpacity * pulse;
+
+  for (const x of [285, 715]) {
+    const gradient = ctx.createRadialGradient(
+      x, 390, 2,
+      x, 390, 48
+    );
+
+    gradient.addColorStop(0, "rgba(255,105,160,0.65)");
+    gradient.addColorStop(0.55, "rgba(255,105,160,0.28)");
+    gradient.addColorStop(1, "rgba(255,105,160,0)");
+
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.ellipse(x, 390, 48, 27, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+
+function drawGoldenRays(t) {
+  // Chỉ hiển thị khi robot hào hứng hoặc ngạc nhiên
+  if (!["excited", "surprised"].includes(expression)) {
+    return;
+  }
+
+  ctx.save();
+
+  const pulse = 0.8 + Math.sin(t * 0.006) * 0.2;
+
+  ctx.globalAlpha = pulse;
+  ctx.strokeStyle = "#FFD166";
+  ctx.lineWidth = 7;
+  ctx.lineCap = "round";
+  ctx.shadowColor = "#FFB52E";
+  ctx.shadowBlur = 14;
+
+  // Tia sáng đối xứng ở giữa đầu
+  const rays = [
+    [440, 105, 425, 76],
+    [465, 91, 458, 58],
+    [490, 84, 488, 48],
+    [510, 84, 512, 48],
+    [535, 91, 542, 58],
+    [560, 105, 575, 76]
+  ];
+
+  rays.forEach(([x1, y1, x2, y2]) => {
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+  });
+
+  ctx.restore();
+}
+
+
 function setExpression(mood, duration = 0) {
   const valid = [
     "neutral", "happy", "sad", "angry",
@@ -771,7 +1219,11 @@ function setExpression(mood, duration = 0) {
 
   if (!valid.includes(mood)) mood = "neutral";
 
+if (expression !== mood) {
+  previousExpression = expression;
   expression = mood;
+  expressionTransition = 0;
+}
   blinkTarget = 1;
 
   expressionUntil = duration > 0
@@ -783,31 +1235,34 @@ function setExpression(mood, duration = 0) {
 function randomIdleExpression(now) {
   if (guestPresent || photoboothActive || now < nextIdleChange) return;
 
-  const choices = [
-    ["neutral", 2500],
-    ["curious", 2200],
-    ["sleepy", 2000],
-    ["wink", 1200],
-    ["happy", 2200],
-    ["laugh", 1800],
-    ["excited", 2000],
-    ["surprised", 1500],
-    ["love", 2200],
-    ["sad", 1800],
-    ["angry", 1500],
-    ["focused", 2200]
-  ];
+const choices = [
+  ["neutral", 4000],
+  ["curious", 4500],
+  ["sleepy", 5000],
+  ["wink", 3500],
+  ["happy", 4500],
+  ["laugh", 4000],
+  ["excited", 4500],
+  ["surprised", 4000],
+  ["love", 4500],
+  ["sad", 4000],
+  ["angry", 4000],
+  ["focused", 4500]
+];
 
   const choice = choices[Math.floor(Math.random() * choices.length)];
 
   setExpression(choice[0], choice[1]);
 
-  nextIdleChange = now + 5000 + Math.random() * 5000;
+  // Nghỉ 2–3 giây trước khi chuyển sang biểu cảm tiếp theo
+nextIdleChange = now + 2000 + Math.random() * 1000;
 }
 
 function updateAnimation(t) {
   randomIdleExpression(t);
-
+  // Chuyển biểu cảm nhanh và mượt trong khoảng 250ms
+expressionTransition += 16 / 250;
+expressionTransition = Math.min(1, expressionTransition);
   if (expressionUntil > 0 && t > expressionUntil &&
       !guestPresent && !photoboothActive) {
     setExpression("neutral");
@@ -822,10 +1277,54 @@ function updateAnimation(t) {
     lastGazeChange = t;
   }
 
-  gazeX += (targetGazeX-gazeX)*.055;
-  gazeY += (targetGazeY-gazeY)*.055;
+  // Natural Eye Tracking
+const eyeSmoothness = guestPresent ? 0.085 : 0.045;
 
-  blink += (blinkTarget-blink)*.3;
+gazeX += (targetGazeX - gazeX) * eyeSmoothness;
+gazeY += (targetGazeY - gazeY) * eyeSmoothness;
+// Natural idle eye movement
+if (!guestPresent && !photoboothActive) {
+  if (t > nextIdleEyeMove) {
+    targetIdleEyeX = (Math.random() - 0.5) * 0.12;
+    targetIdleEyeY = (Math.random() - 0.5) * 0.08;
+
+    nextIdleEyeMove = t + 2500 + Math.random() * 2500;
+  }
+} else {
+  targetIdleEyeX = 0;
+  targetIdleEyeY = 0;
+}
+
+// Smooth idle movement
+idleEyeOffsetX += (targetIdleEyeX - idleEyeOffsetX) * 0.035;
+idleEyeOffsetY += (targetIdleEyeY - idleEyeOffsetY) * 0.035;
+  // Smooth eyelid animation
+const blinkSpeed = blinkTarget < blink ? 0.42 : 0.22;
+blink += (blinkTarget - blink) * blinkSpeed;
+
+// Giới hạn độ mở mắt
+blink = Math.max(0.025, Math.min(1, blink));
+// Micro Expression - Asymmetric Eyebrow Movement
+if (expression === "neutral" && !photoboothActive) {
+  if (t > nextEyebrowMove) {
+    targetEyebrowOffset = (Math.random() - 0.5) * 2;
+
+    targetEyebrowLeft = (Math.random() - 0.5) * 5;
+    targetEyebrowRight = (Math.random() - 0.5) * 5;
+
+    nextEyebrowMove = t + 2500 + Math.random() * 3500;
+  }
+} else {
+  targetEyebrowOffset = 0;
+  targetEyebrowLeft = 0;
+  targetEyebrowRight = 0;
+}
+
+// Smooth eyebrow movement
+eyebrowOffset += (targetEyebrowOffset - eyebrowOffset) * 0.035;
+
+eyebrowLeftOffset += (targetEyebrowLeft - eyebrowLeftOffset) * 0.035;
+eyebrowRightOffset += (targetEyebrowRight - eyebrowRightOffset) * 0.035;
 }
 
 function animate(t) {
@@ -841,23 +1340,45 @@ function animate(t) {
   requestAnimationFrame(animate);
 }
 
+
 function scheduleBlink() {
-  const delay = 2300 + Math.random()*2800;
+  // Chu kỳ chớp mắt ngẫu nhiên
+  const delay = 2800 + Math.random() * 3200;
 
   setTimeout(() => {
-    if (expression !== "laugh" && expression !== "sleepy") {
-      blinkTarget = .04;
+    // Không chớp khi đang cười lớn hoặc ngủ
+    if (
+      expression !== "laugh" &&
+      expression !== "sleepy"
+    ) {
+      // Chớp mắt lần 1
+      blinkTarget = 0.04;
 
       setTimeout(() => {
         blinkTarget = 1;
-      }, 140);
+
+        // 22% cơ hội chớp mắt kép
+        if (Math.random() < 0.22) {
+          setTimeout(() => {
+            blinkTarget = 0.04;
+
+            setTimeout(() => {
+              blinkTarget = 1;
+            }, 130);
+
+          }, 220);
+        }
+
+      }, 130);
     }
 
     scheduleBlink();
+
   }, delay);
 }
 
 scheduleBlink();
+
 
 // KẾT NỐI ROBOT SERVER ONLINE
 let socket;
@@ -877,25 +1398,28 @@ function connectServer() {
   socket.onmessage = (event) => {
     try {
       const data = JSON.parse(event.data);
-
+      // Nhận vị trí khuôn mặt từ Camera AI
+      if (data.type === "tracking") {
+        targetGazeX = data.x;
+        targetGazeY = data.y;
+}
       // Nhận biểu cảm trực tiếp từ Camera AI
       if (data.expression) {
         setExpression(data.expression);
       }
 
       // Nhận diện khách
-      if (data.type === "presence") {
-        guestPresent = !!data.present;
+if (data.type === "presence") {
+  guestPresent = !!data.present;
 
-        if (guestPresent) {
-          targetGazeX = 0;
-          targetGazeY = 0;
-          setExpression("happy");
-        } else if (!photoboothActive) {
-          setExpression("neutral");
-          nextIdleChange = performance.now()+2500;
-        }
-      }
+  if (!guestPresent && !photoboothActive) {
+    targetGazeX = 0;
+    targetGazeY = 0;
+
+    setExpression("neutral");
+    nextIdleChange = performance.now() + 2500;
+  }
+}
 
       // Nhận trạng thái Photobooth
       if (data.type === "photobooth") {
